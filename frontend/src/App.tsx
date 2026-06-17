@@ -1,28 +1,22 @@
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Routes, Route } from "react-router-dom"
+import Layout from "@/components/Layout"
+import RaumBuchen from "@/pages/RaumBuchen"
+import RaumDetails from "@/pages/RaumDetails"
+import BuchungBestaetigen from "@/pages/BuchungBestaetigen"
+import Buchungsbestaetigung from "@/pages/Buchungsbestaetigung"
+import MeineBuchungen from "@/pages/MeineBuchungen"
 
 function App() {
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-8">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Calvin</CardTitle>
-          <CardDescription>INNOQ Raumbuchungssystem</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground">
-            Du kannst jetzt mit dem Aufbau der UI
-            beginnen.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<RaumBuchen />} />
+        <Route path="raeume/:raumId" element={<RaumDetails />} />
+        <Route path="buchen/:raumId" element={<BuchungBestaetigen />} />
+        <Route path="buchung/:buchungId" element={<Buchungsbestaetigung />} />
+        <Route path="meine-buchungen" element={<MeineBuchungen />} />
+      </Route>
+    </Routes>
   )
 }
 
