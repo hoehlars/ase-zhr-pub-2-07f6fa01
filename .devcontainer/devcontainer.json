@@ -32,5 +32,7 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// "containerEnv": {},
+	"onCreateCommand": "bash scripts/install-sdk.sh",
+	"postCreateCommand": "cd frontend && npm install",
 	"postStartCommand": "sudo /usr/local/share/docker-init.sh"
 }

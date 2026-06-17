@@ -17,6 +17,9 @@ export default defineConfig({
     host: "0.0.0.0",
     // Zugriff über den Proxy erfolgt mit fremdem Host (*.svc.cluster.local).
     allowedHosts: true,
+    proxy: {
+      "/api": "http://localhost:3001",
+    },
   },
   resolve: {
     alias: {
