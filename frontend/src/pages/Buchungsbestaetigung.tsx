@@ -1,14 +1,27 @@
-import { Link, useParams } from "react-router-dom"
-import { CheckCircle2, MapPin, Calendar, Clock, FileText } from "lucide-react"
+import { useNavigate, useParams, Link } from "react-router-dom"
+import { CheckCircle2, MapPin, Calendar, Clock, FileText, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { useBuchungen } from "@/lib/buchungen-context"
 import { getRaum, getStandort, formatDatum, formatDauer } from "@/lib/mock-data"
 
 export default function Buchungsbestaetigung() {
   const { buchungId } = useParams()
-  const { getBuchung, loading } = useBuchungen()
+  const { getBuchung, loading, cancelBuchung, istStornierbar } = useBuchungen()
+  const navigate = useNavigate()
 
   const buchung = buchungId ? getBuchung(buchungId) : undefined
 
@@ -29,6 +42,18 @@ export default function Buchungsbestaetigung() {
 
   const raum = getRaum(buchung.raumId)
   const standort = raum ? getStandort(raum.standortId) : undefined
+  const stornierbar = istStornierbar(buchung)
+
+  function handleStornieren() {
+    if (!buchung) return
+    const titel = buchung.titel
+    const datum = formatDatum(buchung.datum)
+    cancelBuchung(buchung.id)
+    toast.success("Buchung storniert", {
+      description: `„${titel}" am ${datum} wurde erfolgreich storniert.`,
+    })
+    navigate("/meine-buchungen")
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6 py-6 text-center">
@@ -68,13 +93,40 @@ export default function Buchungsbestaetigung() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-center gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <Link to="/meine-buchungen" className={cn(buttonVariants())}>
           Zu meinen Buchungen
         </Link>
         <Link to="/" className={cn(buttonVariants({ variant: "outline" }))}>
           Weitere Buchung
         </Link>
+        {stornierbar && (
+          <AlertDialog>
+            <AlertDialogTrigger
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              <Trash2 className="h-4 w-4" />
+              Buchung stornieren
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Buchung stornieren?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Möchtest du die Buchung &ldquo;{buchung.titel}&rdquo; am{" "}
+                  {formatDatum(buchung.datum)} ({buchung.von}–{buchung.bis})
+                  wirklich stornieren? Der Raum wird danach sofort wieder für
+                  andere Mitarbeiter verfügbar.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={handleStornieren}>
+                  Ja, stornieren
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </div>
   )

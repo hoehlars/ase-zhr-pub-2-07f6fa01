@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react"
 import { erstelleBuchung, fetchBuchungen } from "@/lib/api"
-import { getRaum, type Buchung } from "@/lib/mock-data"
+import { getRaum, belegungen, HEUTE, type Buchung } from "@/lib/mock-data"
 
 interface NeueBuchung {
   raumId: string
@@ -25,6 +25,8 @@ interface BuchungenContextValue {
   getBuchung: (id: string) => Buchung | undefined
   /** Sendet die Buchung an den Booking Service und liefert die Bestätigung. */
   addBuchung: (data: NeueBuchung) => Promise<Buchung>
+  cancelBuchung: (id: string) => void
+  istStornierbar: (buchung: Buchung) => boolean
 }
 
 const BuchungenContext = createContext<BuchungenContextValue | null>(null)
@@ -61,9 +63,21 @@ export function BuchungenProvider({ children }: { children: ReactNode }) {
     return neu
   }, [])
 
+  function cancelBuchung(id: string): void {
+    setBuchungen((prev) => prev.filter((b) => b.id !== id))
+    // Entsprechende Belegung entfernen, damit der Raum wieder verfügbar ist.
+    const idx = belegungen.findIndex((bel) => bel.id === `bel-${id}`)
+    if (idx !== -1) belegungen.splice(idx, 1)
+  }
+
+  function istStornierbar(buchung: Buchung): boolean {
+    // Vergangene Buchungen (Datum vor heute) können nicht storniert werden.
+    return buchung.datum >= HEUTE
+  }
+
   return (
     <BuchungenContext.Provider
-      value={{ buchungen, loading, error, getBuchung, addBuchung }}
+      value={{ buchungen, loading, error, getBuchung, addBuchung, cancelBuchung, istStornierbar }}
     >
       {children}
     </BuchungenContext.Provider>
