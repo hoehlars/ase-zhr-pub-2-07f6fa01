@@ -15,13 +15,14 @@ import { AusstattungListe } from "@/components/Ausstattung"
 import { Belegungsleiste } from "@/components/Belegungsleiste"
 import { cn } from "@/lib/utils"
 import { useBuchungsAuswahl } from "@/lib/useBuchungsAuswahl"
+import { useBelegungen } from "@/lib/useBelegungen"
 import {
   getRaum,
   getStandort,
   getZeitOptionen,
   formatDatum,
   formatDauer,
-  istVerfuegbar,
+  istFrei,
   toMinutes,
 } from "@/lib/mock-data"
 
@@ -31,6 +32,9 @@ export default function RaumDetails() {
 
   const raum = raumId ? getRaum(raumId) : undefined
   const zeiten = getZeitOptionen()
+  // Belegte Zeitfenster des Raums am gewählten Datum (CLVN-011, aus dem Backend).
+  const { byRaum } = useBelegungen(raumId ? [raumId] : [], datum)
+  const belegungen = raumId ? (byRaum[raumId] ?? []) : []
 
   if (!raum) {
     return (
@@ -45,7 +49,7 @@ export default function RaumDetails() {
 
   const standort = getStandort(raum.standortId)
   const zeitraumGueltig = toMinutes(bis) > toMinutes(von)
-  const verfuegbar = zeitraumGueltig && istVerfuegbar(raum.id, datum, von, bis)
+  const verfuegbar = zeitraumGueltig && istFrei(belegungen, von, bis)
 
   return (
     <div className="space-y-6">
@@ -135,8 +139,7 @@ export default function RaumDetails() {
           </div>
 
           <Belegungsleiste
-            raumId={raum.id}
-            datum={datum}
+            belegungen={belegungen}
             von={von}
             bis={bis}
             onSelectVon={(neuVon, neuBis) =>

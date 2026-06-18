@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
+import type { Zeitfenster } from "@/lib/api"
 import {
-  getBelegungen,
   toMinutes,
   ueberschneidet,
   OEFFNUNG_VON,
@@ -21,21 +21,19 @@ function minutesToTime(min: number): string {
  * können angeklickt werden, um den Beginn der Buchung zu setzen.
  */
 export function Belegungsleiste({
-  raumId,
-  datum,
+  belegungen,
   von,
   bis,
   onSelectVon,
 }: {
-  raumId: string
-  datum: string
+  /** Belegte Zeitfenster des Raums am gewählten Datum (aus dem Backend). */
+  belegungen: Zeitfenster[]
   von: string
   bis: string
   onSelectVon?: (neuVon: string, neuBis: string) => void
 }) {
   const start = toMinutes(OEFFNUNG_VON)
   const ende = toMinutes(OEFFNUNG_BIS)
-  const belegungen = getBelegungen(raumId, datum)
   const vonMin = toMinutes(von)
   const bisMin = toMinutes(bis)
   const dauer = Math.max(bisMin - vonMin, SLOT_MIN)

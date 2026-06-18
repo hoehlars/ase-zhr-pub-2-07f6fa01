@@ -1,9 +1,13 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
 import {
-  belegungen,
-  eigeneBuchungen,
-  type Buchung,
-} from "@/lib/mock-data"
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
+import { erstelleBuchung, fetchBuchungen } from "@/lib/api"
+import { getRaum, type Buchung } from "@/lib/mock-data"
 
 interface NeueBuchung {
   raumId: string
@@ -16,41 +20,51 @@ interface NeueBuchung {
 
 interface BuchungenContextValue {
   buchungen: Buchung[]
+  loading: boolean
+  error: string | null
   getBuchung: (id: string) => Buchung | undefined
-  addBuchung: (data: NeueBuchung) => Buchung
+  /** Sendet die Buchung an den Booking Service und liefert die Bestätigung. */
+  addBuchung: (data: NeueBuchung) => Promise<Buchung>
 }
 
 const BuchungenContext = createContext<BuchungenContextValue | null>(null)
 
-let counter = 0
-function naechsteId(): string {
-  counter += 1
-  return `mb-neu-${counter}`
-}
-
 export function BuchungenProvider({ children }: { children: ReactNode }) {
-  const [buchungen, setBuchungen] = useState<Buchung[]>(() => [...eigeneBuchungen])
+  const [buchungen, setBuchungen] = useState<Buchung[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let abgebrochen = false
+    fetchBuchungen()
+      .then((daten) => {
+        if (abgebrochen) return
+        setBuchungen(daten)
+        setError(null)
+      })
+      .catch(() => !abgebrochen && setError("Buchungen konnten nicht geladen werden"))
+      .finally(() => !abgebrochen && setLoading(false))
+    return () => {
+      abgebrochen = true
+    }
+  }, [])
 
   function getBuchung(id: string) {
     return buchungen.find((b) => b.id === id)
   }
 
-  function addBuchung(data: NeueBuchung): Buchung {
-    const neu: Buchung = { id: naechsteId(), ...data }
+  const addBuchung = useCallback(async (data: NeueBuchung): Promise<Buchung> => {
+    // Standort ergibt sich aus dem Raum (ADR-0002: das Frontend kennt die Ressourcen).
+    const standortId = getRaum(data.raumId)?.standortId ?? ""
+    const neu = await erstelleBuchung({ ...data, standortId })
     setBuchungen((prev) => [...prev, neu])
-    // Raum für den Zeitraum als belegt markieren (verhindert Doppelbuchung).
-    belegungen.push({
-      id: `bel-${neu.id}`,
-      raumId: neu.raumId,
-      datum: neu.datum,
-      von: neu.von,
-      bis: neu.bis,
-    })
     return neu
-  }
+  }, [])
 
   return (
-    <BuchungenContext.Provider value={{ buchungen, getBuchung, addBuchung }}>
+    <BuchungenContext.Provider
+      value={{ buchungen, loading, error, getBuchung, addBuchung }}
+    >
       {children}
     </BuchungenContext.Provider>
   )

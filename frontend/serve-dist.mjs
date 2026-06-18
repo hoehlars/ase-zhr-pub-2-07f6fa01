@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url"
 
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "dist")
 const PORT = Number(process.env.PORT) || 5173
+// Booking Service, an den /api-Aufrufe weitergereicht werden (analog zum
+// Vite-Dev-Proxy). Der Crucible-Proxy strippt den Pfad-Prefix, daher kommen die
+// Requests hier als "/api/..." an.
+const BACKEND = process.env.BACKEND_URL || "http://localhost:3001"
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -30,10 +34,31 @@ async function sendFile(res, filePath) {
   res.end(data)
 }
 
+function proxyApi(req, res) {
+  const ziel = new URL(req.url, BACKEND)
+  const upstream = http.request(
+    ziel,
+    { method: req.method, headers: { ...req.headers, host: ziel.host } },
+    (up) => {
+      res.writeHead(up.statusCode || 502, up.headers)
+      up.pipe(res)
+    },
+  )
+  upstream.on("error", () => {
+    res.writeHead(502)
+    res.end("backend not reachable")
+  })
+  req.pipe(upstream)
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost")
     let rel = decodeURIComponent(url.pathname).replace(/^\/+/, "")
+
+    // API-Aufrufe an den Booking Service durchreichen (kein SPA-Fallback).
+    if (rel === "api" || rel.startsWith("api/")) return proxyApi(req, res)
+
     let target = path.join(DIST, rel)
 
     // Pfadausbruch verhindern

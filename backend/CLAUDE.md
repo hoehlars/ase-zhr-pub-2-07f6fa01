@@ -7,9 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Booking Service für Calvin (Raumbuchungs-App von INNOQ). **FastAPI + SQLAlchemy + SQLite**
 gemäß [ADR-0001](../docs/architektur/adrs/ADR-0001-technologie-stack-fuer-booking-service.md).
 
-Aktueller Stand: Prototyp-Gerüst mit einem einzigen `/api/hello`-Endpoint in
-`app/main.py`. DB-Anbindung (SQLAlchemy/Alembic) und Buchungslogik existieren noch
-nicht und folgen mit den entsprechenden User Stories (`docs/produkt/backlog/`).
+Aktueller Stand: Buchungs- und Verfügbarkeitslogik sind implementiert (SQLAlchemy +
+SQLite). Endpoints liegen in `app/routers/` (`buchungen.py`, `verfuegbarkeit.py`),
+Fachlogik in `app/services.py` + `app/domain.py`. Pro User Story existiert eine
+E2E-Testdatei unter `tests/test_clvn_XXX_*.py`. Alembic ist als Abhängigkeit
+vorhanden, aber noch ungenutzt (Schema via `Base.metadata.create_all` beim Start).
 
 ## Befehle
 
@@ -25,8 +27,13 @@ python3 -m venv .venv
 - API: `http://localhost:3001/api/...`
 - OpenAPI-Doku: `http://localhost:3001/docs`
 
-Es gibt noch kein Test-Setup. Beim Hinzufügen von Tests neue Dev-Abhängigkeiten in
-`requirements.txt` ergänzen.
+Tests (E2E gegen die echte App via `TestClient`):
+
+```bash
+.venv/bin/python -m pytest
+```
+
+Beim Hinzufügen neuer Dev-Abhängigkeiten diese in `requirements.txt` ergänzen.
 
 ## Architektur & Konventionen
 
@@ -38,8 +45,16 @@ Es gibt noch kein Test-Setup. Beim Hinzufügen von Tests neue Dev-Abhängigkeite
   Betrieb cross-origin aufruft. Bewusst offen für den Prototyp.
 - OpenAPI-Schema wird automatisch aus den Python-Typannotationen generiert — Endpoints
   sauber typisieren (Pydantic-Modelle), statt Schemas von Hand zu pflegen.
-- Geplant: SQLite via SQLAlchemy, Migrationen über Alembic. Doppelbuchungen (QS-2) sollen
-  über DB-seitige Unique-Constraints + Transaktionen verhindert werden — siehe ADR-0001.
+- **Nur IDs, keine Ressourcedetails** (ADR-0002): Buchungen referenzieren `raum_id`/
+  `standort_id`; Anzeigenamen löst die SPA aus ihren Mock-Daten auf.
+- **Basic-Auth ohne Passwort** (ADR-0003): `app/auth.py` liest den Nutzernamen als
+  Identifier; `/api/buchungen`-Endpoints sind darüber dem Nutzer zugeordnet.
+- **JSON in camelCase** (`raumId`, `standortId` …) passend zu den TS-Typen der SPA;
+  Pydantic-Schemas (`app/schemas.py`) mappen auf internes `snake_case`.
+- Doppelbuchungen (QS-2) werden in `app/services.py` über eine Konfliktprüfung in
+  derselben Transaktion verhindert (SQLite serialisiert Schreibzugriffe) — siehe ADR-0001.
+- SQLite via SQLAlchemy; Migrationen über Alembic sind vorgesehen, aktuell wird das
+  Schema beim Start via `Base.metadata.create_all` angelegt.
 
 ## Projekt-Regeln (gelten repo-weit, auch hier)
 

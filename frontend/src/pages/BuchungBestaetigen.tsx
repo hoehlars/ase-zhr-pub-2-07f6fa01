@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { toast } from "sonner"
 import { ArrowLeft, Check } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,14 +10,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { KonfliktError } from "@/lib/api"
 import { useBuchungsAuswahl } from "@/lib/useBuchungsAuswahl"
+import { useBelegungen } from "@/lib/useBelegungen"
 import { useBuchungen } from "@/lib/buchungen-context"
 import {
   getRaum,
   getStandort,
   formatDatum,
   formatDauer,
-  istVerfuegbar,
+  istFrei,
   toMinutes,
 } from "@/lib/mock-data"
 
@@ -37,6 +40,12 @@ export default function BuchungBestaetigen() {
 
   const [titel, setTitel] = useState("")
   const [notiz, setNotiz] = useState("")
+  const [absende, setAbsende] = useState(false)
+
+  // Verfügbarkeit final gegen das Backend prüfen (CLVN-011); das Absenden
+  // verhindert Doppelbuchungen zusätzlich serverseitig (QS-2).
+  const { byRaum } = useBelegungen(raumId ? [raumId] : [], datum)
+  const belegungen = raumId ? (byRaum[raumId] ?? []) : []
 
   const raum = raumId ? getRaum(raumId) : undefined
 
@@ -53,21 +62,31 @@ export default function BuchungBestaetigen() {
 
   const standort = getStandort(raum.standortId)
   const zeitraumGueltig = toMinutes(bis) > toMinutes(von)
-  const verfuegbar = zeitraumGueltig && istVerfuegbar(raum.id, datum, von, bis)
+  const verfuegbar = zeitraumGueltig && istFrei(belegungen, von, bis)
   const titelGefuellt = titel.trim().length > 0
-  const kannAbsenden = verfuegbar && titelGefuellt
+  const kannAbsenden = verfuegbar && titelGefuellt && !absende
 
-  function handleAbsenden() {
+  async function handleAbsenden() {
     if (!kannAbsenden || !raum) return
-    const neu = addBuchung({
-      raumId: raum.id,
-      datum,
-      von,
-      bis,
-      titel: titel.trim(),
-      notiz: notiz.trim() || undefined,
-    })
-    navigate(`/buchung/${neu.id}`)
+    setAbsende(true)
+    try {
+      const neu = await addBuchung({
+        raumId: raum.id,
+        datum,
+        von,
+        bis,
+        titel: titel.trim(),
+        notiz: notiz.trim() || undefined,
+      })
+      navigate(`/buchung/${neu.id}`)
+    } catch (err) {
+      const meldung =
+        err instanceof KonfliktError
+          ? "Dieser Raum ist im gewählten Zeitraum inzwischen belegt."
+          : "Die Buchung konnte nicht gespeichert werden. Bitte erneut versuchen."
+      toast.error(meldung)
+      setAbsende(false)
+    }
   }
 
   return (
@@ -152,7 +171,7 @@ export default function BuchungBestaetigen() {
               disabled={!kannAbsenden}
               onClick={handleAbsenden}
             >
-              Buchung absenden
+              {absende ? "Wird gesendet…" : "Buchung absenden"}
             </Button>
             {!titelGefuellt && verfuegbar && (
               <p className="text-center text-xs text-muted-foreground">

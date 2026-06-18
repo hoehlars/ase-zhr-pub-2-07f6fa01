@@ -29,13 +29,14 @@ import { AusstattungListe } from "@/components/Ausstattung"
 import { cn } from "@/lib/utils"
 import { useStandort } from "@/lib/standort-context"
 import { useBuchungsAuswahl } from "@/lib/useBuchungsAuswahl"
+import { useBelegungen } from "@/lib/useBelegungen"
 import {
   getRaeumeByStandort,
   getStandort,
   getZeitOptionen,
   formatDatum,
   formatDauer,
-  istVerfuegbar,
+  istFrei,
   toMinutes,
   HEUTE,
 } from "@/lib/mock-data"
@@ -61,6 +62,16 @@ export default function RaumBuchen() {
   const raeume = getRaeumeByStandort(standortId)
   const zeiten = getZeitOptionen()
   const zeitraumGueltig = toMinutes(bis) > toMinutes(von)
+
+  // Belegungen aller Räume des Standorts am gewählten Datum (CLVN-011).
+  const {
+    byRaum,
+    loading: belegungenLoading,
+    error: belegungenError,
+  } = useBelegungen(
+    raeume.map((r) => r.id),
+    datum,
+  )
 
   return (
     <div className="space-y-6">
@@ -155,10 +166,24 @@ export default function RaumBuchen() {
       </p>
 
       {/* Raum-Grid */}
+      {belegungenError ? (
+        <p className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
+          Verfügbarkeiten konnten nicht geladen werden. Ist das Backend erreichbar?
+        </p>
+      ) : belegungenLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {raeume.map((raum) => (
+            <div
+              key={raum.id}
+              className="h-48 animate-pulse rounded-xl border bg-muted/40"
+            />
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {raeume.map((raum) => {
           const verfuegbar =
-            zeitraumGueltig && istVerfuegbar(raum.id, datum, von, bis)
+            zeitraumGueltig && istFrei(byRaum[raum.id] ?? [], von, bis)
           const selected = selectedRaumId === raum.id
           // Nur verfügbare Räume sind auswählbar.
           const selectierbar = verfuegbar
@@ -239,6 +264,7 @@ export default function RaumBuchen() {
           )
         })}
       </div>
+      )}
     </div>
   )
 }

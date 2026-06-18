@@ -66,3 +66,8 @@ storybook-static/
 /playwright/.cache/
 /cypress/screenshots/
 /cypress/videos/
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Stray debug screenshots
+/*.png

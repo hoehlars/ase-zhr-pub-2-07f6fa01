@@ -28,18 +28,6 @@ export interface Raum {
   beschreibung: string
 }
 
-/** Eine bestehende Belegung eines Raums (blockiert ein Zeitfenster). */
-export interface Belegung {
-  id: string
-  raumId: string
-  /** ISO-Datum yyyy-mm-dd */
-  datum: string
-  /** "HH:mm" */
-  von: string
-  /** "HH:mm" */
-  bis: string
-}
-
 /** Eine eigene Buchung des angemeldeten Mitarbeiters. */
 export interface Buchung {
   id: string
@@ -312,71 +300,9 @@ export const raeume: Raum[] = [
   },
 ]
 
-// --- Belegungen (bestehende Buchungen anderer Mitarbeiter) --------------
-
-export const belegungen: Belegung[] = [
-  // Köln – Rhein: am 17.06. vormittags + nachmittags belegt
-  { id: "b1", raumId: "koeln-rhein", datum: "2026-06-17", von: "09:00", bis: "10:30" },
-  { id: "b2", raumId: "koeln-rhein", datum: "2026-06-17", von: "13:00", bis: "14:00" },
-  { id: "b3", raumId: "koeln-rhein", datum: "2026-06-18", von: "10:00", bis: "12:00" },
-
-  // Köln – Dom: am 17.06. fast ganztägig belegt
-  { id: "b4", raumId: "koeln-dom", datum: "2026-06-17", von: "08:00", bis: "12:00" },
-  { id: "b5", raumId: "koeln-dom", datum: "2026-06-17", von: "14:00", bis: "17:00" },
-
-  // Köln – Severin: punktuell belegt
-  { id: "b6", raumId: "koeln-severin", datum: "2026-06-17", von: "11:00", bis: "11:30" },
-
-  // Köln – Hohenzollern: nachmittags belegt
-  { id: "b7", raumId: "koeln-hohenzollern", datum: "2026-06-17", von: "15:00", bis: "16:30" },
-
-  // Berlin – Spree
-  { id: "b8", raumId: "berlin-spree", datum: "2026-06-17", von: "09:00", bis: "11:00" },
-  // Hamburg – Elbe
-  { id: "b9", raumId: "hamburg-elbe", datum: "2026-06-17", von: "13:00", bis: "15:00" },
-  // München – Isar
-  { id: "b10", raumId: "muenchen-isar", datum: "2026-06-17", von: "10:00", bis: "12:00" },
-]
-
-// --- Eigene Buchungen (für "Meine Buchungen") ---------------------------
-
-export const eigeneBuchungen: Buchung[] = [
-  {
-    id: "mb1",
-    raumId: "koeln-hohenzollern",
-    datum: "2026-06-18",
-    von: "09:00",
-    bis: "10:00",
-    titel: "Team Sync",
-    notiz: "Wochenplanung mit dem Projektteam.",
-  },
-  {
-    id: "mb2",
-    raumId: "berlin-spree",
-    datum: "2026-06-24",
-    von: "14:00",
-    bis: "16:00",
-    titel: "Kundenworkshop Discovery",
-    notiz: "Workshop-Material vorbereiten.",
-  },
-  {
-    id: "mb3",
-    raumId: "koeln-dom",
-    datum: "2026-07-01",
-    von: "11:00",
-    bis: "12:30",
-    titel: "Architektur-Review",
-  },
-  // Vergangene Buchung
-  {
-    id: "mb4",
-    raumId: "muenchen-isar",
-    datum: "2026-06-10",
-    von: "10:00",
-    bis: "11:00",
-    titel: "1:1 mit Lead",
-  },
-]
+// Hinweis: Bestehende Belegungen und eigene Buchungen liefert der Booking
+// Service (Backend). Demodaten dafür werden serverseitig geseedet
+// (backend/app/seed.py); das Frontend lädt sie über @/lib/api.
 
 // --- Hilfsfunktionen ----------------------------------------------------
 
@@ -398,11 +324,6 @@ export function toMinutes(zeit: string): number {
   return h * 60 + m
 }
 
-/** Belegungen eines Raums an einem Datum. */
-export function getBelegungen(raumId: string, datum: string): Belegung[] {
-  return belegungen.filter((b) => b.raumId === raumId && b.datum === datum)
-}
-
 /** Prüft, ob sich zwei Zeitfenster überschneiden. */
 export function ueberschneidet(
   vonA: string,
@@ -413,16 +334,16 @@ export function ueberschneidet(
   return toMinutes(vonA) < toMinutes(bisB) && toMinutes(vonB) < toMinutes(bisA)
 }
 
-/** Ist der Raum im gewünschten Zeitfenster frei? */
-export function istVerfuegbar(
-  raumId: string,
-  datum: string,
+/**
+ * Ist das Wunschzeitfenster frei, gegeben die belegten Zeitfenster eines Raums?
+ * Die Belegungen liefert das Backend (siehe @/lib/api, @/lib/useBelegungen).
+ */
+export function istFrei(
+  belegungen: { von: string; bis: string }[],
   von: string,
   bis: string,
 ): boolean {
-  return !getBelegungen(raumId, datum).some((b) =>
-    ueberschneidet(von, bis, b.von, b.bis),
-  )
+  return !belegungen.some((b) => ueberschneidet(von, bis, b.von, b.bis))
 }
 
 /** Dauer zwischen zwei Zeiten als lesbarer Text, z.B. "1 Std 30 Min". */

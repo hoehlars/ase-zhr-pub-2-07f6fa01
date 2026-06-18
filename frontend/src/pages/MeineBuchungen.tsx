@@ -46,7 +46,7 @@ function BuchungZeile({ buchung, vergangen }: { buchung: Buchung; vergangen?: bo
 }
 
 export default function MeineBuchungen() {
-  const { buchungen } = useBuchungen()
+  const { buchungen, loading, error } = useBuchungen()
   const heuteKey = Number(HEUTE.replaceAll("-", ""))
 
   const anstehend = buchungen
@@ -67,7 +67,13 @@ export default function MeineBuchungen() {
         </p>
       </div>
 
-      {leer ? (
+      {loading ? (
+        <p className="py-12 text-center text-muted-foreground">Lädt…</p>
+      ) : error ? (
+        <p className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}. Ist das Backend erreichbar?
+        </p>
+      ) : leer ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center">
           <CalendarX2 className="h-10 w-10 text-muted-foreground" />
           <p className="text-muted-foreground">Du hast noch keine Buchungen.</p>

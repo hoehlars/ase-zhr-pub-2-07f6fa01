@@ -8,9 +8,13 @@ import { getRaum, getStandort, formatDatum, formatDauer } from "@/lib/mock-data"
 
 export default function Buchungsbestaetigung() {
   const { buchungId } = useParams()
-  const { getBuchung } = useBuchungen()
+  const { getBuchung, loading } = useBuchungen()
 
   const buchung = buchungId ? getBuchung(buchungId) : undefined
+
+  if (loading && !buchung) {
+    return <p className="py-12 text-center text-muted-foreground">Lädt…</p>
+  }
 
   if (!buchung) {
     return (
