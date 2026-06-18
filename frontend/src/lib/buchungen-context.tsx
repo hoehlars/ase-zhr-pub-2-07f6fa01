@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react"
 import { erstelleBuchung, fetchBuchungen } from "@/lib/api"
-import { getRaum, belegungen, HEUTE, type Buchung } from "@/lib/mock-data"
+import { getRaum, HEUTE, type Buchung } from "@/lib/mock-data"
 
 interface NeueBuchung {
   raumId: string
@@ -65,9 +65,6 @@ export function BuchungenProvider({ children }: { children: ReactNode }) {
 
   function cancelBuchung(id: string): void {
     setBuchungen((prev) => prev.filter((b) => b.id !== id))
-    // Entsprechende Belegung entfernen, damit der Raum wieder verfügbar ist.
-    const idx = belegungen.findIndex((bel) => bel.id === `bel-${id}`)
-    if (idx !== -1) belegungen.splice(idx, 1)
   }
 
   function istStornierbar(buchung: Buchung): boolean {
