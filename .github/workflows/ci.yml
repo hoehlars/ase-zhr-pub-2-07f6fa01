@@ -1,0 +1,146 @@
+name: CI
+
+# Tests auf PRs und Pushes nach main; Image bauen & nach GHCR pushen nur auf main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Standardmäßig nur Lesezugriff; einzelne Jobs erweitern gezielt.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Backend: pytest (Unit-/Integrationsebene) ───────────────────────────────
+  backend-tests:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write        # dorny/test-reporter legt einen Check-Run an
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        run: python -m pytest --junit-xml=test-results/junit.xml
+
+      - name: Report test results
+        uses: dorny/test-reporter@v1
+        if: always()         # auch bei rotem Test einen Report erzeugen
+        with:
+          name: Backend tests
+          path: backend/test-results/junit.xml
+          reporter: java-junit
+
+  # ── Frontend: Playwright (E2E gegen echtes Backend + Vite-Dev-Server) ────────
+  frontend-e2e:
+    name: Frontend E2E (Playwright)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python wird gebraucht, weil Playwright das Backend (uvicorn) selbst startet.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # Backend-venv unter backend/.venv anlegen – die playwright.config.ts startet
+      # den Server über ".venv/bin/uvicorn" (cwd: ../backend).
+      - name: Set up backend venv
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Report test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Frontend E2E
+          path: frontend/test-results/junit.xml
+          reporter: java-junit
+
+      - name: Upload Playwright traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7
+
+  # ── Backend-Image bauen und nach GHCR pushen (nur Push auf main) ─────────────
+  build-and-push:
+    name: Build & push backend image
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write      # Push ins GitHub Container Registry
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -15,7 +15,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: "list",
+  // In CI zusätzlich JUnit-XML schreiben (für dorny/test-reporter); lokal nur "list".
+  reporter: process.env.CI
+    ? [["list"], ["junit", { outputFile: "test-results/junit.xml" }]]
+    : "list",
   globalTeardown: "./e2e/global-teardown.ts",
   use: {
     baseURL,
