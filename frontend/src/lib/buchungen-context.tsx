@@ -2,6 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react"
 import {
   belegungen,
   eigeneBuchungen,
+  HEUTE,
   type Buchung,
 } from "@/lib/mock-data"
 
@@ -18,6 +19,8 @@ interface BuchungenContextValue {
   buchungen: Buchung[]
   getBuchung: (id: string) => Buchung | undefined
   addBuchung: (data: NeueBuchung) => Buchung
+  cancelBuchung: (id: string) => void
+  istStornierbar: (buchung: Buchung) => boolean
 }
 
 const BuchungenContext = createContext<BuchungenContextValue | null>(null)
@@ -49,8 +52,20 @@ export function BuchungenProvider({ children }: { children: ReactNode }) {
     return neu
   }
 
+  function cancelBuchung(id: string): void {
+    setBuchungen((prev) => prev.filter((b) => b.id !== id))
+    // Entsprechende Belegung entfernen, damit der Raum wieder verfügbar ist.
+    const idx = belegungen.findIndex((bel) => bel.id === `bel-${id}`)
+    if (idx !== -1) belegungen.splice(idx, 1)
+  }
+
+  function istStornierbar(buchung: Buchung): boolean {
+    // Vergangene Buchungen (Datum vor heute) können nicht storniert werden.
+    return buchung.datum >= HEUTE
+  }
+
   return (
-    <BuchungenContext.Provider value={{ buchungen, getBuchung, addBuchung }}>
+    <BuchungenContext.Provider value={{ buchungen, getBuchung, addBuchung, cancelBuchung, istStornierbar }}>
       {children}
     </BuchungenContext.Provider>
   )
